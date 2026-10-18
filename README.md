@@ -77,9 +77,11 @@ momentum-strategy-backtest/
 └── README.md
 ```
 
-## Key Financial Formulas
+## ## Key Financial Formulas
 
 ### 1. Simple Return
+
+The simple return measures the percentage change in an asset's price between two consecutive periods.
 
 \[
 R_t = \frac{P_t-P_{t-1}}{P_{t-1}}
@@ -87,17 +89,23 @@ R_t = \frac{P_t-P_{t-1}}{P_{t-1}}
 
 ### 2. Cumulative Return
 
+Cumulative return measures the total portfolio return over the entire investment period.
+
 \[
 R_{\mathrm{cum}} = \frac{V_T}{V_0}-1
 \]
 
 ### 3. Annualized Volatility
 
+Annualized volatility estimates the yearly variability of returns using daily return volatility.
+
 \[
-\sigma_{\mathrm{annual}}=\sigma_{\mathrm{daily}}\sqrt{252}
+\sigma_{\mathrm{annual}} = \sigma_{\mathrm{daily}}\sqrt{252}
 \]
 
 ### 4. Sharpe Ratio
+
+The Sharpe ratio measures risk-adjusted performance by comparing excess annual return with annualized volatility.
 
 \[
 S = \frac{R_{\mathrm{annual}}-R_f}{\sigma_{\mathrm{annual}}}
@@ -105,29 +113,44 @@ S = \frac{R_{\mathrm{annual}}-R_f}{\sigma_{\mathrm{annual}}}
 
 ### 5. Maximum Drawdown
 
-\[
-DD_t=\frac{V_t}{\max_{s\leq t}V_s}-1
-\]
+Drawdown measures the decline in portfolio value relative to its previous running peak.
 
 \[
-MDD=\min_t DD_t
+DD_t = \frac{V_t}{\displaystyle\max_{s\leq t}V_s}-1
+\]
+
+Maximum drawdown is the largest peak-to-trough decline, expressed here as a negative return.
+
+\[
+MDD = \min_t DD_t
 \]
 
 ### 6. Compound Annual Growth Rate (CAGR)
 
+CAGR estimates the constant annual growth rate that would produce the observed change in portfolio value over the investment period.
+
 \[
-CAGR=\left(\frac{V_T}{V_0}\right)^{1/Y}-1
+CAGR = \left(\frac{V_T}{V_0}\right)^{\frac{1}{Y}}-1
 \]
 
-Where:
+### Definitions of Variables
 
-- \(P_t\) = asset price at time \(t\)
-- \(V_0\) = initial portfolio value
-- \(V_T\) = final portfolio value
-- \(R_f\) = annual risk-free rate
-- \(Y\) = investment period in years
+- \(R_t\): Asset return at time \(t\).
+- \(P_t\): Asset price at time \(t\).
+- \(P_{t-1}\): Asset price in the previous period.
+- \(R_{\mathrm{cum}}\): Cumulative return over the investment period.
+- \(V_0\): Initial portfolio value.
+- \(V_T\): Final portfolio value.
+- \(\sigma_{\mathrm{daily}}\): Standard deviation of daily returns.
+- \(\sigma_{\mathrm{annual}}\): Annualized standard deviation of returns.
+- \(R_{\mathrm{annual}}\): Annualized portfolio return, using the convention implemented in the backtest.
+- \(R_f\): Annual risk-free rate.
+- \(DD_t\): Drawdown at time \(t\).
+- \(MDD\): Maximum drawdown.
+- \(Y\): Investment period in years.
+- \(252\): Assumed number of trading days per year.
 
-These are standard financial formulas. Consult the project's source code and methodology report for the exact calculations and assumptions implemented.
+ These are standard financial formulas. The exact return calculation, annualization convention, risk-free rate assumption, and treatment of transaction costs should be verified against the project's source code and methodology report.
 
 ## Interactive Dashboards
 
