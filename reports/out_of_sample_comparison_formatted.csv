@@ -1,0 +1,4 @@
+Strategy,Total Return (%),CAGR (%),Annualized Volatility (%),Sharpe Ratio,Maximum Drawdown (%),Calmar Ratio
+MA Crossover,321.3116,46.3895,26.3355,1.5782,-28.1962,1.6452
+Momentum,250.1646,39.3874,28.2604,1.2960,-31.1225,1.2656
+SPY Buy & Hold,110.1275,21.7455,14.8744,1.3898,-18.7552,1.1594

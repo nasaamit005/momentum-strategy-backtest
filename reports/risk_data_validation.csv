@@ -1,0 +1,7 @@
+Period,Strategy,Observations,Missing_Returns,Missing_Equity,Max_Normalized_Equity_Difference,Growth_Path_Matches,Start_Date,End_Date
+Full Period,MA Crossover,2965,0,0,3.872457909892546e-13,True,2015-01-02,2026-10-16
+Full Period,Momentum,2965,0,0,3.730349362740526e-13,True,2015-01-02,2026-10-16
+Full Period,SPY Buy & Hold,2965,0,0,2.753353101070388e-13,True,2015-01-02,2026-10-16
+Out of Sample,MA Crossover,951,0,0,2.5757174171303632e-14,True,2023-01-03,2026-10-16
+Out of Sample,Momentum,951,0,0,7.993605777301127e-15,True,2023-01-03,2026-10-16
+Out of Sample,SPY Buy & Hold,951,0,0,4.6629367034256575e-14,True,2023-01-03,2026-10-16

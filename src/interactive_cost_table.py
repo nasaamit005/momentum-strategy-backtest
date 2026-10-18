@@ -1,0 +1,421 @@
+
+from pathlib import Path
+import json
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parent.parent
+INPUT = ROOT / "reports" / "cost_sensitivity_summary.csv"
+OUTPUT = ROOT / "reports" / "interactive_cost_sensitivity_table.html"
+
+if not INPUT.exists():
+    raise FileNotFoundError(f"Could not find: {INPUT}")
+
+df = pd.read_csv(INPUT)
+
+# Convert decimal returns to percentages for readable display.
+percent_metrics = [
+    "Total Return",
+    "CAGR",
+    "Annualized Volatility",
+    "Maximum Drawdown",
+]
+
+for col in percent_metrics:
+    if col in df.columns:
+        df[col] = df[col] * 100
+
+# Keep cost as originally reported: 0.1 means 0.1%.
+if "Transaction Cost (%)" in df.columns:
+    df["Transaction Cost (%)"] = df["Transaction Cost (%)"].astype(float)
+
+# Replace missing / infinite values with JSON-safe nulls.
+df = df.replace([float("inf"), float("-inf")], float("nan"))
+records = json.loads(df.to_json(orient="records"))
+
+columns = list(df.columns)
+payload = json.dumps(
+    {"columns": columns, "rows": records},
+    allow_nan=False
+).replace("</", "<\\/")
+
+html = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transaction Cost Sensitivity | Analytics Dashboard</title>
+<style>
+:root {
+  --navy: #17365d;
+  --blue: #2563eb;
+  --bg: #f3f6fb;
+  --text: #172b4d;
+  --muted: #64748b;
+  --border: #dce4ef;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+.hero {
+  background: linear-gradient(120deg, #17365d, #2563eb);
+  color: white;
+  padding: 30px 5%;
+}
+.hero h1 { margin: 0 0 8px; font-size: 28px; }
+.hero p { margin: 0; color: #e3edff; }
+.container { max-width: 1500px; margin: auto; padding: 24px; }
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.kpi, .panel {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(30, 50, 90, .05);
+}
+.kpi { padding: 20px; }
+.kpi .label { color: var(--muted); font-size: 13px; }
+.kpi .value { font-size: 28px; font-weight: 750; margin-top: 9px; }
+.kpi .sub { color: var(--muted); font-size: 12px; margin-top: 5px; }
+.panel { padding: 20px; }
+.panel h2 { margin: 0 0 16px; font-size: 19px; }
+.controls {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto auto;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+input, select, button {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font: inherit;
+}
+input, select { background: white; color: var(--text); min-width: 0; }
+button {
+  cursor: pointer;
+  background: var(--navy);
+  color: white;
+  border-color: var(--navy);
+  font-weight: 600;
+}
+button:hover { filter: brightness(1.12); }
+button.secondary { background: white; color: var(--navy); }
+.table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 1050px; }
+thead { background: #e8effa; }
+th, td {
+  padding: 13px 12px;
+  text-align: right;
+  border-bottom: 1px solid #e8edf5;
+  white-space: nowrap;
+  font-size: 13px;
+}
+th { color: #17365d; font-weight: 700; cursor: pointer; user-select: none; }
+th:first-child, td:first-child { text-align: left; }
+tbody tr:hover { background: #eff6ff; }
+.strategy { font-weight: 700; }
+.tag {
+  display: inline-block; padding: 4px 8px; border-radius: 20px;
+  background: #e0e7ff; color: #3730a3; font-size: 11px; font-weight: 700;
+}
+.positive { color: #15803d; font-weight: 700; }
+.negative { color: #b91c1c; font-weight: 700; }
+.pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 14px; flex-wrap: wrap;
+}
+.pagination .left, .pagination .right { display: flex; align-items: center; gap: 8px; }
+.small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.footer-note {
+  margin-top: 18px; padding: 14px; border-radius: 8px;
+  background: #eff6ff; color: #334155; line-height: 1.6; font-size: 13px;
+}
+@media (max-width: 850px) {
+  .kpis { grid-template-columns: 1fr; }
+  .controls { grid-template-columns: 1fr 1fr; }
+  .controls input { grid-column: 1 / -1; }
+  .container { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<header class="hero">
+  <h1>Transaction-Cost Sensitivity</h1>
+  <p>Interactive strategy comparison · Out-of-sample performance</p>
+</header>
+
+<main class="container">
+  <section class="kpis">
+    <div class="kpi">
+      <div class="label">Best CAGR in current view</div>
+      <div class="value" id="bestCagr">—</div>
+      <div class="sub" id="bestCagrName">Based on filtered rows</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Highest Sharpe Ratio</div>
+      <div class="value" id="bestSharpe">—</div>
+      <div class="sub" id="bestSharpeName">Risk-adjusted performance</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Rows displayed</div>
+      <div class="value" id="rowCount">0</div>
+      <div class="sub">Responds to search and filters</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Performance table</h2>
+    <div class="controls">
+      <input id="search" placeholder="Search strategy or any value..." aria-label="Search table">
+      <select id="strategyFilter" aria-label="Filter strategy">
+        <option value="">All strategies</option>
+      </select>
+      <select id="costFilter" aria-label="Filter transaction cost">
+        <option value="">All transaction costs</option>
+      </select>
+      <button id="reset" class="secondary">Reset filters</button>
+      <button id="download">Download CSV</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="bodyRows"></tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <div class="left">
+        <span class="small">Rows per page</span>
+        <select id="pageSize" aria-label="Rows per page">
+          <option>5</option>
+          <option selected>10</option>
+          <option>25</option>
+          <option>50</option>
+        </select>
+        <span class="small" id="pageInfo"></span>
+      </div>
+      <div class="right">
+        <button class="secondary" id="prev">← Previous</button>
+        <button class="secondary" id="next">Next →</button>
+      </div>
+    </div>
+    <p class="small">Click a column heading to sort. Use search, filters and pagination to explore the results.</p>
+  </section>
+
+  <div class="footer-note">
+    <strong>Interpretation:</strong> higher CAGR and Sharpe ratio are generally preferable,
+    while a maximum drawdown closer to zero means a smaller historical peak-to-trough loss.
+    Results are historical estimates and do not guarantee future returns.
+  </div>
+</main>
+
+<script>
+const dataset = __DATA__;
+const columns = dataset.columns;
+const originalRows = dataset.rows;
+
+const percentCols = new Set([
+  "Total Return", "CAGR", "Annualized Volatility", "Maximum Drawdown"
+]);
+const numericCols = new Set(columns.filter(c =>
+  c !== "Strategy"
+));
+
+let sortColumn = "CAGR";
+let sortDirection = -1;
+let currentPage = 1;
+
+const el = id => document.getElementById(id);
+const num = value => value === null || value === "" || !Number.isFinite(Number(value))
+  ? null : Number(value);
+
+function displayValue(column, value) {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = num(value);
+  if (n !== null && numericCols.has(column)) {
+    if (column === "Transaction Cost (%)") return n.toFixed(3) + "%";
+    if (percentCols.has(column)) return n.toFixed(2) + "%";
+    return n.toFixed(3);
+  }
+  return String(value);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+
+function initFilters() {
+  const strategies = [...new Set(originalRows.map(r => r.Strategy).filter(Boolean))];
+  strategies.forEach(s => {
+    const option = document.createElement("option");
+    option.value = s;
+    option.textContent = s;
+    el("strategyFilter").appendChild(option);
+  });
+
+  const costs = [...new Set(originalRows.map(r => r["Transaction Cost (%)"])
+    .filter(v => v !== null && v !== undefined))]
+    .sort((a, b) => Number(a) - Number(b));
+
+  costs.forEach(cost => {
+    const option = document.createElement("option");
+    option.value = String(cost);
+    option.textContent = Number(cost).toFixed(3) + "%";
+    el("costFilter").appendChild(option);
+  });
+}
+
+function filteredRows() {
+  const query = el("search").value.trim().toLowerCase();
+  const strategy = el("strategyFilter").value;
+  const cost = el("costFilter").value;
+
+  let rows = originalRows.filter(row => {
+    if (strategy && row.Strategy !== strategy) return false;
+    if (cost !== "" && String(row["Transaction Cost (%)"]) !== cost) return false;
+    if (query && !columns.some(c =>
+      String(row[c] ?? "").toLowerCase().includes(query)
+    )) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    const av = a[sortColumn], bv = b[sortColumn];
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "number" && typeof bv === "number") {
+      return (av - bv) * sortDirection;
+    }
+    return String(av).localeCompare(String(bv)) * sortDirection;
+  });
+  return rows;
+}
+
+function render() {
+  const rows = filteredRows();
+  const pageSize = Number(el("pageSize").value);
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  currentPage = Math.min(currentPage, pages);
+  const start = (currentPage - 1) * pageSize;
+  const visible = rows.slice(start, start + pageSize);
+
+  el("headRow").innerHTML = columns.map(c => {
+    const arrow = c === sortColumn ? (sortDirection === 1 ? " ▲" : " ▼") : " ↕";
+    return `<th data-col="${escapeHtml(c)}">${escapeHtml(c)}${arrow}</th>`;
+  }).join("");
+
+  el("bodyRows").innerHTML = visible.map(row => {
+    const cells = columns.map(c => {
+      const value = row[c];
+      let cls = "";
+      if (c === "CAGR" || c === "Total Return") {
+        cls = num(value) >= 0 ? "positive" : "negative";
+      }
+      if (c === "Strategy") {
+        return `<td class="strategy"><span class="tag">${escapeHtml(value)}</span></td>`;
+      }
+      return `<td class="${cls}">${escapeHtml(displayValue(c, value))}</td>`;
+    }).join("");
+    return `<tr>${cells}</tr>`;
+  }).join("");
+
+  if (!visible.length) {
+    el("bodyRows").innerHTML =
+      `<tr><td colspan="${columns.length}" style="text-align:center;padding:28px">No matching rows found.</td></tr>`;
+  }
+
+  el("rowCount").textContent = rows.length;
+  el("pageInfo").textContent = rows.length
+    ? `Showing ${start + 1}–${Math.min(start + pageSize, rows.length)} of ${rows.length}`
+    : "No rows";
+  el("prev").disabled = currentPage <= 1;
+  el("next").disabled = currentPage >= pages;
+
+  const bestCagr = rows.filter(r => num(r.CAGR) !== null)
+    .sort((a, b) => Number(b.CAGR) - Number(a.CAGR))[0];
+  const bestSharpe = rows.filter(r => num(r["Sharpe Ratio"]) !== null)
+    .sort((a, b) => Number(b["Sharpe Ratio"]) - Number(a["Sharpe Ratio"]))[0];
+
+  el("bestCagr").textContent = bestCagr ? displayValue("CAGR", bestCagr.CAGR) : "—";
+  el("bestCagrName").textContent = bestCagr ? bestCagr.Strategy : "No data";
+  el("bestSharpe").textContent = bestSharpe
+    ? Number(bestSharpe["Sharpe Ratio"]).toFixed(3) : "—";
+  el("bestSharpeName").textContent = bestSharpe ? bestSharpe.Strategy : "No data";
+}
+
+function downloadCsv() {
+  const rows = filteredRows();
+  const quote = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [
+    columns.map(quote).join(","),
+    ...rows.map(row => columns.map(c => quote(row[c])).join(","))
+  ].join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], {type: "text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "filtered_cost_sensitivity_results.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+el("headRow").addEventListener("click", event => {
+  const th = event.target.closest("th");
+  if (!th) return;
+  const col = th.dataset.col;
+  if (sortColumn === col) sortDirection *= -1;
+  else {
+    sortColumn = col;
+    sortDirection = numericCols.has(col) ? -1 : 1;
+  }
+  currentPage = 1;
+  render();
+});
+
+["search", "strategyFilter", "costFilter", "pageSize"].forEach(id => {
+  el(id).addEventListener(id === "search" ? "input" : "change", () => {
+    currentPage = 1;
+    render();
+  });
+});
+el("reset").addEventListener("click", () => {
+  el("search").value = "";
+  el("strategyFilter").value = "";
+  el("costFilter").value = "";
+  currentPage = 1;
+  render();
+});
+el("download").addEventListener("click", downloadCsv);
+el("prev").addEventListener("click", () => {
+  currentPage--;
+  render();
+});
+el("next").addEventListener("click", () => {
+  currentPage++;
+  render();
+});
+
+initFilters();
+render();
+</script>
+</body>
+</html>
+"""
+
+html = html.replace("__DATA__", payload)
+OUTPUT.write_text(html, encoding="utf-8")
+
+print(f"Interactive dashboard saved to: {OUTPUT}")
+print("Features: search, filters, sortable columns, pagination, KPI cards, CSV export.")
